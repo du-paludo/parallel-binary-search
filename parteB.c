@@ -28,13 +28,13 @@ pthread_mutex_t mutexQueue;
 
 // variáveis para busca
 ll *InputVector;         // Vetor principal para busca
-ll Q[MAX_QUERIES];       // Vetor de consultas para valores a serem buscados
+ll *Q;       // Vetor de consultas para valores a serem buscados
 int Pos[MAX_THREADS];    // Armazena o índice encontrado por cada thread
 int nThreads;
 
 // Variáveis para fila de tarefas
 int queueSize = 0;
-task_t taskQueue[100];
+task_t taskQueue[MAX_QUERIES];
 int done = 0;  // Variável de controle para indicar fim das tarefas
 
 // Função que cada thread usará para buscar `currentSearchValue`
@@ -128,6 +128,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Gera o vetor de consultas `Q`
+    Q = malloc(nQueries * sizeof(ll));
     for (int i = 0; i < nQueries; i++) {
         Q[i] = rand() % (nTotalElements * 2); 
     }
@@ -167,5 +168,6 @@ int main(int argc, char *argv[]) {
     pthread_mutex_destroy(&mutexQueue);
     pthread_cond_destroy(&condQueue);
     free(InputVector);
+    free(Q);
     return 0;
 }
