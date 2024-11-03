@@ -1,18 +1,23 @@
-# Makefile
 CC = gcc
 CFLAGS = -std=c99 -Wall -g -D_POSIX_C_SOURCE=199309L
 LDFLAGS = -lpthread
 
-all: main
+all: parteA parteB
 
-main: main.o chrono.o
-	$(CC) $(CFLAGS) -o main main.o chrono.o $(LDFLAGS)
+parteA: parteA.o chrono.o
+	$(CC) $(CFLAGS) -o parteA parteA.o chrono.o $(LDFLAGS)
 
-main.o: main.c
-	$(CC) $(CFLAGS) -c main.c
+parteA.o: parteA.c
+	$(CC) $(CFLAGS) -c parteA.c
+
+parteB: parteB.o chrono.o
+	$(CC) $(CFLAGS) -o parteB parteB.o chrono.o $(LDFLAGS)
+
+parteB.o: parteB.c
+	$(CC) $(CFLAGS) -c parteB.c
 
 chrono.o: chrono.c
 	$(CC) $(CFLAGS) -c chrono.c
 
 clean:
-	rm -f *.o main
+	rm -f *.o parteA parteB
