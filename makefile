@@ -1,5 +1,5 @@
 flags = -Wall
-nome = bsearch
+nome = bsearch-A
 
 all: $(nome)
 

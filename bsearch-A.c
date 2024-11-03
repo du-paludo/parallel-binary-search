@@ -11,9 +11,10 @@
 #include "chrono.h"
 
 #define MAX_THREADS 8
-#define MAX_TOTAL_ELEMENTS 1000
+#define MAX_TOTAL_ELEMENTS 16000000
+#define NTIMES 8
 #define _XOPEN_SOURCE 600
-#define DEBUG 1
+#define DEBUG 0
 
 #define ll long long
 
@@ -72,7 +73,7 @@ void* thread_worker(void* ptr) {
         pthread_barrier_wait(&thread_barrier);
         partialResults[index] = lower_bound(input, left, right, target);
         #if DEBUG
-        printf("Thread %d[%d-%d] result: %lld\n", index, left, right, partialResults[index]);
+        printf("Thread %d[%d-%d] result: %d\n", index, left, right, partialResults[index]);
         #endif
         pthread_barrier_wait(&thread_barrier);
 
@@ -88,7 +89,7 @@ int parallel_binary_search(int nThreads) {
     int result = nTotalElements;
 
     threads_ids[0] = 0;
-    for(int i = 1; i < nThreads; i++) {
+    for (int i = 1; i < nThreads; i++) {
         threads_ids[i] = i;
         pthread_create(&threads[i], NULL, thread_worker, &threads_ids[i]);
     }
@@ -142,7 +143,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
-    printf("Will use %d threads to run binary search on %d total long long elements\n\n", nThreads, nTotalElements);
+    printf("Will use %d threads to run binary search on %d total long long elements\n", nThreads, nTotalElements);
 
     // Inicializações
     input = malloc(sizeof(ll) * nTotalElements);
@@ -171,10 +172,10 @@ int main(int argc, char* argv[]) {
     chrono_stop(&parallelBinarySearchTime);
     chrono_reportTime(&parallelBinarySearchTime, "parallelBinarySearchTime");
 
-    double total_time_in_seconds = (double) chrono_gettotal( &parallelBinarySearchTime ) / ((double)1000*1000*1000);
-    printf("Total time in seconds: %lf s\n", total_time_in_seconds );
+    double total_time_in_nanoseconds = (double) chrono_gettotal( &parallelBinarySearchTime );
+    printf("Total time: %lf ns\n", total_time_in_nanoseconds);
                                   
-    double ops = ((double)nTotalElements)/total_time_in_seconds;
+    double ops = 1/total_time_in_nanoseconds*(1000*1000*1000);
     printf("Throughput: %lf OP/s\n", ops);
 
     free(input);
