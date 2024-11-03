@@ -1,0 +1,6 @@
+as funções de tempo tão funcionando até onde sei
+a busca binária também, só ta implementada com lógica errada, 
+do jeito que ta chamando o vetor nesse código é melhor 
+fazer busca paralela particionando o vetor, pra fazer a busca 
+paralela pra vários elementos tem que mudar algumas coisas ainda,
+a versão atual não implementa nenhum dos jeitos mas quase os dois hehe
