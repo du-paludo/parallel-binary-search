@@ -8,16 +8,18 @@
 #define MAX_THREADS 8
 #define MAX_TOTAL_ELEMENTS (500*1000*1000)
 #define MAX_QUERIES 1000000 // Número de buscas a serem realizadas
+#define BATCH_SIZE 10 // Number of queries to process in each task
 
 typedef long long ll;
 
 // Estrutura para encapsulamento de tarefas
 struct task {
-    void (*func)(ll*, int, ll, int*);
+    void (*func)(ll*, int, ll*, int, int*);
     ll* arr;
     int n;
-    ll x;
-    int* result_pos; // Ponteiro para armazenar o resultado
+    ll* queries; // Array of queries
+    int batch_size; // Number of queries in this batch
+    int* result_pos; // Pointer to store results
 };
 typedef struct task task_t;
 
@@ -68,9 +70,16 @@ void lower_bound(ll* arr, int n, ll x, int* result_pos) {
     *result_pos = low; // Armazena o índice encontrado
 }
 
+// Function to process a batch of queries
+void batch_lower_bound(ll* arr, int n, ll* queries, int batch_size, int* results) {
+    for (int i = 0; i < batch_size; i++) {
+        lower_bound(arr, n, queries[i], &results[i]);
+    }
+}
+
 void execute_task(task_t* task) {
     if (task->func) {
-        task->func(task->arr, task->n, task->x, task->result_pos);
+        task->func(task->arr, task->n, task->queries, task->batch_size, task->result_pos);
     }
 }
 
@@ -109,7 +118,7 @@ task_t dequeue_task(task_queue_t* queue) {
     task_node_t* node = queue->head;
     if (node == NULL) {
         pthread_mutex_unlock(&mutexQueue);
-        return (task_t){NULL, NULL, 0, 0, NULL}; // Retorna uma tarefa vazia se a fila estiver vazia
+        return (task_t){NULL, NULL, 0, NULL, 0, NULL}; // Retorna uma tarefa vazia se a fila estiver vazia
     }
 
     queue->head = node->next;
@@ -119,8 +128,8 @@ task_t dequeue_task(task_queue_t* queue) {
     queue->size--;
 
     task_t task = node->task;
-    free(node);
     pthread_mutex_unlock(&mutexQueue);
+    free(node);
     return task;
 }
 
@@ -143,6 +152,14 @@ void* start_thread(void* arg) {
         execute_task(&task);
     }
     return NULL;
+}
+
+// Sinaliza fim das tarefas
+void signal_done() {
+    pthread_mutex_lock(&mutexQueue);
+    done = 1;
+    pthread_mutex_unlock(&mutexQueue);
+    pthread_cond_broadcast(&condQueue);
 }
 
 int main(int argc, char *argv[]) {
@@ -178,7 +195,7 @@ int main(int argc, char *argv[]) {
     Q = malloc(nQueries * sizeof(ll));
     Pos = malloc(nQueries * sizeof(int));
     for (int i = 0; i < nQueries; i++) {
-        Q[i] = i * 2; 
+        Q[i] = rand() % (nTotalElements * 2); // Gera um valor aleatório para a busca
     }
 
     // Criação do pool de threads
@@ -188,22 +205,20 @@ int main(int argc, char *argv[]) {
     }    
 
     chronometer_t searchTime;
-
-    // Submissão das tarefas
-    for (int i = 0; i < nQueries; i++) {
-        task_t task = {lower_bound, InputVector, nTotalElements, Q[i], &Pos[i]};
-        submit_task(task);
-    }
     chrono_reset(&searchTime);
     chrono_start(&searchTime);
+
+    // Submissão das tarefas em lotes
+    for (int i = 0; i < nQueries; i += BATCH_SIZE) {
+        int batch_size = (i + BATCH_SIZE > nQueries) ? nQueries - i : BATCH_SIZE;
+        task_t task = {batch_lower_bound, InputVector, nTotalElements, &Q[i], batch_size, &Pos[i]};
+        submit_task(task);
+    }
 
     pthread_cond_broadcast(&condQueue);
 
     // Sinaliza fim das tarefas e notifica todas as threads
-    pthread_mutex_lock(&mutexQueue);
-    done = 1;
-    pthread_mutex_unlock(&mutexQueue);
-    pthread_cond_broadcast(&condQueue);
+    signal_done();
 
     for (int i = 0; i < nThreads; i++) {
         pthread_join(threads[i], NULL);
@@ -212,11 +227,28 @@ int main(int argc, char *argv[]) {
     chrono_stop(&searchTime);
     chrono_reportTime(&searchTime, "Tempo total para buscas paralelas");
 
-    double total_time = (double)chrono_gettotal(&searchTime)/((double)1000*1000*1000);
-    printf ("tempo total: %lf s\n", total_time);
+    double total_time = (double)chrono_gettotal(&searchTime) / ((double)1000 * 1000 * 1000);
+    printf("tempo total: %lf s\n", total_time);
 
-    double ops =((double)nTotalElements)/total_time;
-    printf ("Throughput: %lf OP/s\n", ops);
+    double ops = ((double)nTotalElements) / total_time;
+    printf("Throughput: %lf OP/s\n", ops);
+
+    // //imprime entrada
+    // for(int i=0; i<nTotalElements; i++) {
+    //     printf("InputVector[%d] = %lld ", i, InputVector[i]);
+    // }
+
+    // printf ("\n");
+
+    // //imprime quaries e resultados
+    // for(int i=0; i<nQueries; i++) {
+    //     printf("Q[%d] = %lld\n", i, Q[i]);
+    // }
+
+    // //imprime os resultados
+    // for(int i=0; i<nQueries; i++) {
+    //     printf("Pos[%d] = %d\n", i, Pos[i]);
+    // }
 
     pthread_mutex_destroy(&mutexQueue);
     pthread_cond_destroy(&condQueue);
