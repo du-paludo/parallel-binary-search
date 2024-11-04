@@ -11,28 +11,39 @@
 
 typedef long long ll;
 
-//estrutura para encapsulamento de tarefas
-struct task{
+// Estrutura para encapsulamento de tarefas
+struct task {
     void (*func)(ll*, int, ll, int*);
     ll* arr;
     int n;
     ll x;
-    int* result_pos; // ponteiro para armazenar o resultado
+    int* result_pos; // Ponteiro para armazenar o resultado
 };
 typedef struct task task_t;
 
-// variáveis thread
+// Estrutura do nó da fila de tarefas
+struct task_node {
+    task_t task;
+    struct task_node* next;
+};
+typedef struct task_node task_node_t;
+
+// Estrutura para a fila de tarefas
+struct task_queue {
+    task_node_t* head;
+    task_node_t* tail;
+    int size;
+};
+typedef struct task_queue task_queue_t;
+
+// Variáveis de thread
 pthread_t threads[MAX_THREADS];
 int threads_ids[MAX_THREADS];
 pthread_cond_t condQueue;
 pthread_mutex_t mutexQueue;
 
-// variáveis para busca
-// Vetor de consultas para valores a serem buscado
-
-// Variáveis para fila de tarefas
-int queueSize = 0;
-task_t taskQueue[MAX_QUERIES];
+// Fila de tarefas dinâmica
+task_queue_t taskQueue;
 int done = 0;  // Variável de controle para indicar fim das tarefas
 
 // Função que cada thread usará para buscar `currentSearchValue`
@@ -42,7 +53,7 @@ void lower_bound(ll* arr, int n, ll x, int* result_pos) {
     int high = n;
 
     while (low < high) {
-        mid = low + (high-low)/2;
+        mid = low + (high - low) / 2;
         if (x <= arr[mid]) {
             high = mid;
         } else {
@@ -63,38 +74,72 @@ void execute_task(task_t* task) {
     }
 }
 
-void submit_task(task_t task) {
+// Função para inicializar a fila de tarefas
+void init_task_queue(task_queue_t* queue) {
+    queue->head = NULL;
+    queue->tail = NULL;
+    queue->size = 0;
+}
+
+// Função para adicionar uma tarefa na fila (enqueue)
+void enqueue_task(task_queue_t* queue, task_t task) {
+    task_node_t* new_node = malloc(sizeof(task_node_t));
+    new_node->task = task;
+    new_node->next = NULL;
+
     pthread_mutex_lock(&mutexQueue);
-    taskQueue[queueSize] = task;
-    queueSize++;    
+    if (queue->tail == NULL) {
+        queue->head = new_node;
+    } else {
+        queue->tail->next = new_node;
+    }
+    queue->tail = new_node;
+    queue->size++;
     pthread_mutex_unlock(&mutexQueue);
-    pthread_cond_signal(&condQueue);    
+    pthread_cond_signal(&condQueue);
+}
+
+// Função para remover uma tarefa da fila (dequeue)
+task_t dequeue_task(task_queue_t* queue) {
+    pthread_mutex_lock(&mutexQueue);
+    while (queue->size == 0 && !done) {
+        pthread_cond_wait(&condQueue, &mutexQueue);
+    }
+
+    task_node_t* node = queue->head;
+    if (node == NULL) {
+        pthread_mutex_unlock(&mutexQueue);
+        return (task_t){NULL, NULL, 0, 0, NULL}; // Retorna uma tarefa vazia se a fila estiver vazia
+    }
+
+    queue->head = node->next;
+    if (queue->head == NULL) {
+        queue->tail = NULL;
+    }
+    queue->size--;
+
+    task_t task = node->task;
+    free(node);
+    pthread_mutex_unlock(&mutexQueue);
+    return task;
+}
+
+// Substitui a função submit_task para enfileirar a tarefa
+void submit_task(task_t task) {
+    enqueue_task(&taskQueue, task);
 }
 
 // Função executada por cada thread para consumir as tarefas
 void* start_thread(void* arg) {
     int thread_id = *((int*) arg);
     while (1) {
-        task_t task;
-        pthread_mutex_lock(&mutexQueue);
-        
-        while (queueSize == 0 && !done) {
-            pthread_cond_wait(&condQueue, &mutexQueue);
-        }
-        
-        // Verifica se todas as tarefas foram processadas e o fim foi sinalizado
-        if (done && queueSize == 0) {
-            pthread_mutex_unlock(&mutexQueue);
+        task_t task = dequeue_task(&taskQueue);
+
+        // Verifica se uma tarefa vazia foi retornada (indicando que não há mais tarefas)
+        if (done && task.func == NULL) {
             break;
         }
-        
-        task = taskQueue[0];
-        for (int i = 0; i < queueSize - 1; i++) {
-            taskQueue[i] = taskQueue[i + 1];
-        }
-        queueSize--;
 
-        pthread_mutex_unlock(&mutexQueue);
         execute_task(&task);
     }
     return NULL;
@@ -107,6 +152,7 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_init(&mutexQueue, NULL);
     pthread_cond_init(&condQueue, NULL);
+    init_task_queue(&taskQueue);
 
     if (argc != 4) {
         printf("Uso: %s <nTotalElements> <nThreads> <nQueries>\n", argv[0]);
@@ -135,7 +181,7 @@ int main(int argc, char *argv[]) {
         Q[i] = i * 2; 
     }
 
-    // criando pool de threads
+    // Criação do pool de threads
     for (int i = 0; i < nThreads; i++) {
         threads_ids[i] = i;
         pthread_create(&threads[i], NULL, start_thread, &threads_ids[i]);
@@ -143,7 +189,7 @@ int main(int argc, char *argv[]) {
 
     chronometer_t searchTime;
 
-    // número de pesquisas a serem realizadas 
+    // Submissão das tarefas
     for (int i = 0; i < nQueries; i++) {
         task_t task = {lower_bound, InputVector, nTotalElements, Q[i], &Pos[i]};
         submit_task(task);
@@ -153,7 +199,7 @@ int main(int argc, char *argv[]) {
 
     pthread_cond_broadcast(&condQueue);
 
-    //Sinaliza fim das tarefas e notifica todas as threads
+    // Sinaliza fim das tarefas e notifica todas as threads
     pthread_mutex_lock(&mutexQueue);
     done = 1;
     pthread_mutex_unlock(&mutexQueue);
@@ -177,5 +223,6 @@ int main(int argc, char *argv[]) {
     free(InputVector);
     free(Q);
     free(Pos);
+
     return 0;
 }
