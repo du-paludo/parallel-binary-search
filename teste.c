@@ -7,20 +7,21 @@
 #include <limits.h>
 
 #define MAX_THREADS 8
-#define MAX_TOTAL_ELEMENTS (500*1000*1000)
+#define MAX_TOTAL_ELEMENTS (500*250*250) // 2GB long long
 #define MAX_QUERIES 1000000 // Número de buscas a serem realizadas
 #define BATCH_SIZE 10 // Number of queries to process in each task
 
 typedef long long ll;
 
-// Estrutura para encapsulamento de tarefas
+/* estruturas da fila de tarefas para execução das tarefas*/
+// Estrutura para encapsulamento de tarefas, 
 struct task {
-    void (*func)(ll*, int, ll*, int, int*);
-    ll* arr;
-    int n;
-    ll* queries; // Array of queries
-    int batch_size; // Number of queries in this batch
-    int* result_pos; // Pointer to store results
+    void (*func)(ll*, int, ll*, int, int*); // função a ser executada nesse caso lower_bound
+    ll* arr; // vetor de entradas, onde será realizada a busca
+    int n; // tamanho do vetor de entradas
+    ll* queries; // array de consultas, elementos que serão busacdos no vetor de entradas
+    int batch_size; // número de consultas nesse lote
+    int* result_pos; // ponteiro para armazenar a posição do elemento encontrado
 };
 typedef struct task task_t;
 
@@ -45,9 +46,13 @@ int threads_ids[MAX_THREADS];
 pthread_cond_t condQueue;
 pthread_mutex_t mutexQueue;
 
-// Fila de tarefas dinâmica
-task_queue_t taskQueue;
-int done = 0;  // Variável de controle para indicar fim das tarefas
+
+task_queue_t taskQueue; //fila de tarefas a serem executadas
+int done = 0;  // Variável de controle para indicar fim das tarefas e finalizar a pool de threads
+
+ll InputVector[MAX_TOTAL_ELEMENTS]; // Vetor principal para busca
+ll Qg[MAX_QUERIES];
+// ll* input = InputVector;
 
 ll random_ll() {
     return (ll)rand() % LLONG_MAX;
@@ -57,7 +62,13 @@ int compare_ll(const void* a, const void* b) {
     return (*(ll*)a - *(ll*)b);
 }
 
-// Função que cada thread usará para buscar `currentSearchValue`
+void imprimirVetor(ll* vetor, int n) {
+    for (int i = 0; i < n; i++) {
+        printf("vetor[%d] = %lld\n", i, vetor[i]);
+    }
+}
+
+// função de busca binária
 void lower_bound(ll* arr, int n, ll x, int* result_pos) {
     int mid;
     int low = 0;
@@ -79,15 +90,16 @@ void lower_bound(ll* arr, int n, ll x, int* result_pos) {
     *result_pos = low; // Armazena o índice encontrado
 }
 
-// Function to process a batch of queries
+// função para processar um lote de consultas
 void batch_lower_bound(ll* arr, int n, ll* queries, int batch_size, int* results) {
     for (int i = 0; i < batch_size; i++) {
         lower_bound(arr, n, queries[i], &results[i]);
     }
 }
 
+// inicia a execução da tarefa
 void execute_task(task_t* task, int thread_id) {
-    printf ("Thread %d - Executando tarefa\n", thread_id);
+    // printf ("Thread %d - Executando tarefa\n", thread_id);
     if (task->func) {
         task->func(task->arr, task->n, task->queries, task->batch_size, task->result_pos);
     }
@@ -144,9 +156,9 @@ task_t dequeue_task(task_queue_t* queue) {
 }
 
 // Substitui a função submit_task para enfileirar a tarefa
-void submit_task(task_t task) {
-    enqueue_task(&taskQueue, task);
-}
+// void submit_task(task_t task) {
+//     enqueue_task(&taskQueue, task);
+// }
 
 // Função executada por cada thread para consumir as tarefas
 void* start_thread(void* arg) {
@@ -173,7 +185,7 @@ void signal_done() {
 }
 
 int main(int argc, char *argv[]) {
-    ll *InputVector;         // Vetor principal para busca
+    ll *input;         // Vetor principal para busca
     ll *Q;   
     int *Pos;
 
@@ -195,21 +207,39 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // Inicializa vetor de entrada e vetor de consultas
     srand(time(NULL)); 
-    InputVector = malloc(nTotalElements * sizeof(ll));
+    // Inicializa vetor de entrada e vetor de consultas
+    input = malloc(nTotalElements * sizeof(ll));
     for (int i = 0; i < nTotalElements; i++) {
-        InputVector[i] = random_ll();
+        input[i] = random_ll();
     }
 
-    qsort (InputVector, nTotalElements, sizeof(ll), compare_ll);
+    qsort (input, nTotalElements, sizeof(ll), compare_ll);
 
-    Q = malloc(nQueries * sizeof(ll));
+    if (nTotalElements < MAX_TOTAL_ELEMENTS) {
+        for (int i = 0; i < MAX_TOTAL_ELEMENTS; i++) {
+        InputVector[i] = input[i % nTotalElements];
+        // printf ("InputVector[%d] = %lld\n", i, InputVector[i]);
+        }
+    }
+
+    free (input);
+
     Pos = malloc(nQueries * sizeof(int));
+    Q = malloc(nQueries * sizeof(ll));
     for (int i = 0; i < nQueries; i++) {
         // Q[i] = rand() % (nTotalElements * 2); // Gera um valor aleatório para a busca
         Q[i] = random_ll();
     }
+    
+    if (nQueries < MAX_QUERIES) {
+        for (int i = 0; i < MAX_QUERIES; i++) {
+            Qg[i] = Q[i % nQueries];
+            // printf ("Qg[%d] = %lld\n", i, Qg[i]);
+        }
+    }
+
+    free (Q);
 
     // Criação do pool de threads
     for (int i = 0; i < nThreads; i++) {
@@ -221,11 +251,28 @@ int main(int argc, char *argv[]) {
     chrono_reset(&searchTime);
     chrono_start(&searchTime);
 
+    int start_position = 0;
+    int start_position_q = 0;
+    Q = &Qg[start_position_q];
+    input = &InputVector[start_position];
+
     // Submissão das tarefas em lotes
     for (int i = 0; i < nQueries; i += BATCH_SIZE) {
-        int batch_size = (i + BATCH_SIZE > nQueries) ? nQueries - i : BATCH_SIZE;
-        task_t task = {batch_lower_bound, InputVector, nTotalElements, &Q[i], batch_size, &Pos[i]};
-        submit_task(task);
+        int batch_size = (i + BATCH_SIZE > nQueries) ? nQueries - i : BATCH_SIZE; //se for maior que o tamanho do vetor de consultas, pega o restante
+        task_t task = {batch_lower_bound, input, nTotalElements, &Q[i], batch_size, &Pos[i]};
+        enqueue_task(&taskQueue, task);
+
+        start_position += nTotalElements;
+        start_position_q += nQueries;
+
+        if (start_position_q + nQueries > MAX_QUERIES) 
+            start_position_q = 0;
+        Q = &Qg[start_position_q];
+        
+        if (start_position + nTotalElements > MAX_TOTAL_ELEMENTS) {
+            start_position = 0;
+        input = &InputVector[start_position];
+        }
     }
 
     pthread_cond_broadcast(&condQueue);
@@ -243,17 +290,18 @@ int main(int argc, char *argv[]) {
     double total_time = (double)chrono_gettotal(&searchTime) / ((double)1000 * 1000 * 1000);
     printf("tempo total: %lf s\n", total_time);
 
-    double ops = ((double)nTotalElements) / total_time;
+    double ops = ((double)nQueries) / total_time;
     printf("Throughput: %lf OP/s\n", ops);
 
-    // //imprime entrada
+    // impressões para debug 
+    // imprime entrada
     // for(int i=0; i<nTotalElements; i++) {
-    //     printf("InputVector[%d] = %lld ", i, InputVector[i]);
+    //     printf("input[%d] = %lld ", i, input[i]);
     // }
 
     // printf ("\n");
 
-    // //imprime quaries e resultados
+    // imprime quaries e resultados
     // for(int i=0; i<nQueries; i++) {
     //     printf("Q[%d] = %lld\n", i, Q[i]);
     // }
@@ -265,8 +313,6 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_destroy(&mutexQueue);
     pthread_cond_destroy(&condQueue);
-    free(InputVector);
-    free(Q);
     free(Pos);
 
     return 0;
