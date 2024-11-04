@@ -7,7 +7,7 @@
 
 #define MAX_THREADS 8
 #define MAX_TOTAL_ELEMENTS (500*1000*1000)
-#define MAX_QUERIES 100000 // Número de buscas a serem realizadas
+#define MAX_QUERIES 1000000 // Número de buscas a serem realizadas
 
 typedef long long ll;
 
