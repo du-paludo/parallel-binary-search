@@ -9,15 +9,19 @@
 #define MAX_THREADS 8
 #define MAX_TOTAL_ELEMENTS (500*1000*1000)
 #define MAX_QUERIES 1000000 // Número de buscas a serem realizadas
+#define BATCH_SIZE 10 // Number of queries to process in each task
 
 typedef long long ll;
 
 //estrutura para encapsulamento de tarefas
 struct task{
-    void (*func)(ll*, int, ll, int*);
+    // void (*func)(ll*, int, ll, int); old
+    void (*func)(ll*, int, ll*, int, int*); // new
     ll* arr;
     int n;
-    ll x;
+    // ll x; mudança old
+    ll* queries; // array de consultas new
+    int batch_size; // número de consultas neste lote new
     int* result_pos; // ponteiro para armazenar o resultado
 };
 typedef struct task task_t;
@@ -66,9 +70,17 @@ void lower_bound(ll* arr, int n, ll x, int* result_pos) {
     *result_pos = low; // Armazena o índice encontrado
 }
 
+//função para executar lotes de pesquisas
+void batch_lower_bound(ll* arr, int n, ll* queries, int batch_size, int* results) {
+    for (int i = 0; i < batch_size; i++) {
+        lower_bound(arr, n, queries[i], &results[i]);
+    }
+}
+
 void execute_task(task_t* task) {
     if (task->func) {
-        task->func(task->arr, task->n, task->x, task->result_pos);
+        // task->func(task->arr, task->n, task->x, task->result_pos); //old
+        task->func(task->arr, task->n, task->queries, task->batch_size, task->result_pos); //new
     }
 }
 
@@ -157,10 +169,18 @@ int main(int argc, char *argv[]) {
     chronometer_t searchTime;
 
     // número de pesquisas a serem realizadas 
-    for (int i = 0; i < nQueries; i++) {
-        task_t task = {lower_bound, InputVector, nTotalElements, Q[i], &Pos[i]};
+    // for (int i = 0; i < nQueries; i++) {
+    //     task_t task = {lower_bound, InputVector, nTotalElements, Q[i], &Pos[i]};
+    //     submit_task(task);
+    // } // old
+
+    // número de pesquisas a serem realizadas
+    for (int i = 0; i < nQueries; i += BATCH_SIZE) {
+        int batch_size = (i + BATCH_SIZE > nQueries) ? nQueries - i : BATCH_SIZE;
+        task_t task = {batch_lower_bound, InputVector, nTotalElements, &Q[i], batch_size, &Pos[i]};
         submit_task(task);
-    }
+    } // new
+
     chrono_reset(&searchTime);
     chrono_start(&searchTime);
 
@@ -185,10 +205,10 @@ int main(int argc, char *argv[]) {
     double ops =((double)nTotalElements)/total_time;
     printf ("Throughput: %lf OP/s\n", ops);
 
-    //imprime entrada
-    for(int i=0; i<nTotalElements; i++) {
-        printf("InputVector[%d] = %lld ", i, InputVector[i]);
-    }
+    // //imprime entrada
+    // for(int i=0; i<nTotalElements; i++) {
+    //     printf("InputVector[%d] = %lld ", i, InputVector[i]);
+    // }
 
     //imprime quaries e resultados
     // for(int i=0; i<nQueries; i++) {
