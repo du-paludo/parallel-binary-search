@@ -12,6 +12,9 @@ fi
 
 nElements=$1
 
+make purge
+make
+
 # Loop over the number of threads
 for i in {1..8}
 do
