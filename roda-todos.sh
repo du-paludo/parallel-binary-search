@@ -16,7 +16,7 @@ do
     for j in {1..10}
     do
         # Execute o programa e filtre o tempo
-        tempo=$(./parteB $nElements $i $nQueries | grep -oP '(?<=tempo total: )[^ ]*')
+        tempo=$(./teste $nElements $i $nQueries | grep -oP '(?<=tempo total: )[^ ]*')
         echo "Execução $j: $tempo segundos"
 
         #total_time=$(echo "$total_time + $tempo" | bc)

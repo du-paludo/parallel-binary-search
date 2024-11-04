@@ -105,6 +105,9 @@ int main(int argc, char *argv[]) {
     ll *Q;   
     int *Pos;
 
+    pthread_mutex_init(&mutexQueue, NULL);
+    pthread_cond_init(&condQueue, NULL);
+
     if (argc != 4) {
         printf("Uso: %s <nTotalElements> <nThreads> <nQueries>\n", argv[0]);
         return -1;
@@ -139,16 +142,18 @@ int main(int argc, char *argv[]) {
     }    
 
     chronometer_t searchTime;
-    chrono_reset(&searchTime);
-    chrono_start(&searchTime);
 
     // número de pesquisas a serem realizadas 
     for (int i = 0; i < nQueries; i++) {
         task_t task = {lower_bound, InputVector, nTotalElements, Q[i], &Pos[i]};
         submit_task(task);
     }
+    chrono_reset(&searchTime);
+    chrono_start(&searchTime);
 
-    // Sinaliza fim das tarefas e notifica todas as threads
+    pthread_cond_broadcast(&condQueue);
+
+    //Sinaliza fim das tarefas e notifica todas as threads
     pthread_mutex_lock(&mutexQueue);
     done = 1;
     pthread_mutex_unlock(&mutexQueue);
