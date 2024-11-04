@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include "chrono.h"
+#include <limits.h>
 
 #define MAX_THREADS 8
 #define MAX_TOTAL_ELEMENTS (500*1000*1000)
@@ -48,6 +49,14 @@ pthread_mutex_t mutexQueue;
 task_queue_t taskQueue;
 int done = 0;  // Variável de controle para indicar fim das tarefas
 
+ll random_ll() {
+    return (ll)rand() % LLONG_MAX;
+}
+
+int compare_ll(const void* a, const void* b) {
+    return (*(ll*)a - *(ll*)b);
+}
+
 // Função que cada thread usará para buscar `currentSearchValue`
 void lower_bound(ll* arr, int n, ll x, int* result_pos) {
     int mid;
@@ -77,7 +86,8 @@ void batch_lower_bound(ll* arr, int n, ll* queries, int batch_size, int* results
     }
 }
 
-void execute_task(task_t* task) {
+void execute_task(task_t* task, int thread_id) {
+    printf ("Thread %d - Executando tarefa\n", thread_id);
     if (task->func) {
         task->func(task->arr, task->n, task->queries, task->batch_size, task->result_pos);
     }
@@ -149,7 +159,7 @@ void* start_thread(void* arg) {
             break;
         }
 
-        execute_task(&task);
+        execute_task(&task, thread_id);
     }
     return NULL;
 }
@@ -189,13 +199,16 @@ int main(int argc, char *argv[]) {
     srand(time(NULL)); 
     InputVector = malloc(nTotalElements * sizeof(ll));
     for (int i = 0; i < nTotalElements; i++) {
-        InputVector[i] = i * 2;  
+        InputVector[i] = random_ll();
     }
+
+    qsort (InputVector, nTotalElements, sizeof(ll), compare_ll);
 
     Q = malloc(nQueries * sizeof(ll));
     Pos = malloc(nQueries * sizeof(int));
     for (int i = 0; i < nQueries; i++) {
-        Q[i] = rand() % (nTotalElements * 2); // Gera um valor aleatório para a busca
+        // Q[i] = rand() % (nTotalElements * 2); // Gera um valor aleatório para a busca
+        Q[i] = random_ll();
     }
 
     // Criação do pool de threads
