@@ -2,7 +2,6 @@
 # Natael Pontarolo Gomes - GRR20211786
 
 # flags = -Wall
-nome = bsearch-A
 
 all: bsearch-A bsearch-B
 
@@ -25,4 +24,4 @@ clean:
 	rm -f *~ *.o
 
 purge: clean
-	rm -f $(nome)
+	rm -f bsearch-A bsearch-B
