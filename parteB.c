@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <stdlib.h>
+#include <limits.h>
 #include "chrono.h"
 
 #define MAX_THREADS 8
@@ -34,6 +35,14 @@ pthread_mutex_t mutexQueue;
 int queueSize = 0;
 task_t taskQueue[MAX_QUERIES];
 int done = 0;  // Variável de controle para indicar fim das tarefas
+
+ll random_ll(){
+    return (ll)rand() % LLONG_MAX;
+}
+
+int compare_ll(const void *a, const void *b) {
+    return (*(ll*)a - *(ll*)b);
+}
 
 // Função que cada thread usará para buscar `currentSearchValue`
 void lower_bound(ll* arr, int n, ll x, int* result_pos) {
@@ -126,13 +135,17 @@ int main(int argc, char *argv[]) {
     srand(time(NULL)); 
     InputVector = malloc(nTotalElements * sizeof(ll));
     for (int i = 0; i < nTotalElements; i++) {
-        InputVector[i] = i * 2;  
+        // InputVector[i] = i * 2;  
+        InputVector[i] = random_ll();
     }
+
+    qsort(InputVector, nTotalElements, sizeof(ll), compare_ll);
 
     Q = malloc(nQueries * sizeof(ll));
     Pos = malloc(nQueries * sizeof(int));
     for (int i = 0; i < nQueries; i++) {
-        Q[i] = i * 2; 
+        // Q[i] = i * 2; 
+        Q[i] = random_ll();
     }
 
     // criando pool de threads
@@ -142,14 +155,16 @@ int main(int argc, char *argv[]) {
     }    
 
     chronometer_t searchTime;
-    chrono_reset(&searchTime);
-    chrono_start(&searchTime);
 
     // número de pesquisas a serem realizadas 
     for (int i = 0; i < nQueries; i++) {
         task_t task = {lower_bound, InputVector, nTotalElements, Q[i], &Pos[i]};
         submit_task(task);
     }
+    chrono_reset(&searchTime);
+    chrono_start(&searchTime);
+
+    pthread_cond_broadcast(&condQueue);
 
     // Sinaliza fim das tarefas e notifica todas as threads
     pthread_mutex_lock(&mutexQueue);
@@ -169,6 +184,21 @@ int main(int argc, char *argv[]) {
 
     double ops =((double)nTotalElements)/total_time;
     printf ("Throughput: %lf OP/s\n", ops);
+
+    //imprime entrada
+    for(int i=0; i<nTotalElements; i++) {
+        printf("InputVector[%d] = %lld ", i, InputVector[i]);
+    }
+
+    //imprime quaries e resultados
+    // for(int i=0; i<nQueries; i++) {
+    //     printf("Q[%d] = %lld\n", i, Q[i]);
+    // }
+
+    // //imprime os resultados
+    // for(int i=0; i<nQueries; i++) {
+    //     printf("Pos[%d] = %d\n", i, Pos[i]);
+    // }
 
     pthread_mutex_destroy(&mutexQueue);
     pthread_cond_destroy(&condQueue);
