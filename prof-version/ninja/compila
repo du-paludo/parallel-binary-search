@@ -1,8 +1,0 @@
-#pergunta: porque nao linka corretamente se usa gcc?
-g++-10 -O6 -pthread reduceSumPth.c -o reduceSumPth -fopenmp
-
-#show omp assembly output
-#g++-10 -S -g -O6 -fverbose-asm -pthread reduceSumPth.c -o reduceSumPth.S -fopenmp
-
-#gcc -O6  reduceSumPth.c -o reduceSumPth -lpthread
-

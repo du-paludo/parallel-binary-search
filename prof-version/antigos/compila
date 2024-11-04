@@ -1,4 +1,0 @@
-#pergunta: porque nao linka corretamente se usa gcc?
-
-g++ -O3 -pthread reduceSumPth.c -o reduceSumPth
-
