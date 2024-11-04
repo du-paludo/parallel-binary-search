@@ -1,45 +1,32 @@
+#define _XOPEN_SOURCE 600
 #include <stdio.h>
 #include <pthread.h>
 #include <time.h>
-#include <limits.h>
-#include <unistd.h>
-#include <sys/syscall.h>
-#include <errno.h>
 #include <stdlib.h>
+#include "chrono.h"
 
 #define MAX_THREADS 8
-#define MAX_TOTAL_ELEMENTS 1000
-#define ll long long
+#define MAX_TOTAL_ELEMENTS (500*1000*1000)
+#define MAX_QUERIES 100000 // Número de buscas a serem realizadas
 
-pthread_t threads[MAX_THREADS];
-int threads_ids[MAX_THREADS];
-// pthread_barrier_t thread_barrier;
+typedef long long ll;
 
-ll* Pos;
-ll* Q;
+// Variáveis de busca e threads
+ll *InputVector;        // Vetor principal para busca
+ll *Q;                  // Vetor de consultas para valores a serem buscados
+int Pos[MAX_THREADS];   // Armazena o índice encontrado por cada thread
+int nThreads;
+int nQueries;
+int nTotalElements;
 
-void imprimeVetor(ll* arr, int n) {
-    for (int i = 0; i < n; i++) {
-        printf("%lld ", arr[i]);
-    }
-    printf("\n");
-}
-
-ll random_ll() {
-    return (ll) rand() % LLONG_MAX;
-}
-
-int compare(const void* a, const void* b) {
-    return (*(ll*)a - *(ll*)b);
-}
-
-int lower_bound(ll* arr, int n, int x) {
+// Função de busca binária
+void lower_bound(ll* arr, int n, ll x) {
     int mid;
     int low = 0;
     int high = n;
 
     while (low < high) {
-        mid = low + (high - low) / 2;
+        mid = low + (high-low)/2;
         if (x <= arr[mid]) {
             high = mid;
         } else {
@@ -51,94 +38,85 @@ int lower_bound(ll* arr, int n, int x) {
         low++;
     }
 
-    return low;
+    printf("Elemento a ser buscado: %lld\n", x);
+    printf("Posição encontrada: %d\n", low);
 }
 
-typedef struct {
-    ll* arr;
-    int n;
-    int x;
-} ThreadData;
+// Função executada por cada thread para processar seu bloco de consultas
+void* start_thread(void* arg) {
+    int thread_id = *((int*) arg);
 
-void* thread_func(void* arg) {
-    ThreadData* data = (ThreadData*) arg;
-    int pos = lower_bound(data->arr, data->n, data->x);
-    printf ("elemento a ser buscado na thread: %lld\n", data->x);
-    printf("Posição encontrada: %d\n", pos);
-    pthread_exit(NULL);
+    // Calcula o intervalo de consultas que esta thread processará
+    int queries_per_thread = nQueries / nThreads;
+    int start = thread_id * queries_per_thread;
+    int end = (thread_id == nThreads - 1) ? nQueries : start + queries_per_thread;
+
+    printf("Thread %d processando consultas de %d a %d\n", thread_id, start, end - 1);
+
+    // Processa cada consulta na sua faixa
+    for (int i = start; i < end; i++) {
+        lower_bound(InputVector, nTotalElements, Q[i]);
+    }
+
+    return NULL;
 }
 
-// void initialize_threads(int nThreads, int* arr, int n, int x) {
-//     // pthread_barrier_init(&thread_barrier, NULL, nThreads);
+int main(int argc, char *argv[]) {
+    if (argc != 4) {
+        printf("Uso: %s <nTotalElements> <nThreads> <nQueries>\n", argv[0]);
+        return -1;
+    }
 
-// }
+    nTotalElements = atoi(argv[1]);
+    nThreads = atoi(argv[2]);
+    nQueries = atoi(argv[3]);
 
-int main(int argc, char* argv[]) {
-    int nThreads, nTotalElements, nQueries;
+    if (nQueries > MAX_QUERIES) {
+        printf("Número de consultas não pode exceder %d\n", MAX_QUERIES);
+        return -1;
+    }
 
-    srand(time(NULL));
-
-    // if (argc != 4) {
-    //      printf("Usage: %s <nTotalElements> <nThreads> <nQueries>\n", argv[0]); 
-    //      return 0;
-    // } else {
-    //     nThreads = atoi(argv[2]);
-    //     if (nThreads == 0) {
-    //         printf("Usage: %s <nTotalElements> <nThreads> <nQueries>\n", argv[0]);
-    //         printf("<nThreads> can't be 0\n");
-    //         return 0;
-    //     }     
-    //     if (nThreads > MAX_THREADS) {  
-    //         printf("Usage: %s <nTotalElements> <nThreads> <nQueries>\n", argv[0]);
-    //         printf("<nThreads> must be less than %d\n", MAX_THREADS);
-    //         return 0;
-    //     }
-    //     nTotalElements = atoi(argv[1]);
-    //     if (nTotalElements > MAX_TOTAL_ELEMENTS) {
-    //         printf("Usage: %s <nTotalElements> <nThreads <nQueries>\n", argv[0]);
-    //         printf("<nTotalElements> must be up to %d\n", MAX_TOTAL_ELEMENTS);
-    //         return 0;
-    //     }
-    //     nQueries = atoi(argv[3]);
-    // }
-
-    nThreads = 3;
-    nTotalElements = 10;
-    // nQueries = 7;
-    ll test_queries[] = {1, 20, 12436, 9123, 1234, 8574, 5};
-    // memcpy(Q, fixed_queries, sizeof(fixed_queries));
-
-    Pos = malloc(sizeof(ll) * nTotalElements);
+    // Inicializa vetor de entrada e vetor de consultas
+    srand(time(NULL)); 
+    InputVector = malloc(nTotalElements * sizeof(ll));
     for (int i = 0; i < nTotalElements; i++) {
-        // Pos[i] = random_ll();
-        Pos[i] = i;
+        InputVector[i] = i * 2;  
     }
 
-    qsort(Pos, nTotalElements, sizeof(ll), compare);
-    imprimeVetor(Pos, nTotalElements);
+    // Gera o vetor de consultas `Q`
+    Q = malloc(nQueries * sizeof(ll));
+    for (int i = 0; i < nQueries; i++) {
+        Q[i] = rand() % (nTotalElements * 2); 
+    }
 
-    // Q = malloc(sizeof(ll) * nQueries);
-    // for (int i = 0; i < nQueries; i++) {
-    //     Q[i] = random_ll();
-    // }
+    chronometer_t searchTime;
+    chrono_reset(&searchTime);
+    chrono_start(&searchTime);
 
-    ThreadData data = {NULL, 0, 0};
+    pthread_t threads[MAX_THREADS];
+    int threads_ids[MAX_THREADS];
 
+    // Criando pool de threads
     for (int i = 0; i < nThreads; i++) {
-        printf ("Criando thread %d\n", i);
-        printf ("Elemento a ser buscado: %lld\n", test_queries[i]);
-        ThreadData* data = malloc(sizeof(ThreadData));
-        *data = (ThreadData) {Pos, nTotalElements, test_queries[i]};
-        pthread_create(&threads[i], NULL, thread_func, &data);
-        printf ("Thread %d criada\n", i);
-    }
+        threads_ids[i] = i;
+        pthread_create(&threads[i], NULL, &start_thread, &threads_ids[i]);
+    }    
 
+    // Espera todas as threads terminarem
     for (int i = 0; i < nThreads; i++) {
         pthread_join(threads[i], NULL);
     }
 
-    free(Pos);
-    // free(Q);
+    chrono_stop(&searchTime);
+    chrono_reportTime(&searchTime, "Tempo total para buscas paralelas");
 
+    double total_time = (double)chrono_gettotal(&searchTime)/((double)1000*1000*1000);
+    printf ("tempo total: %lf s\n", total_time);
+
+    double ops =((double)nTotalElements)/total_time;
+    printf ("Throughput: %lf OP/s\n", ops);
+
+    free(InputVector);
+    free(Q);
     return 0;
 }
