@@ -1,3 +1,6 @@
+// Eduardo Stefanel Paludo - GRR20210581
+// Natael Pontarolo Gomes - GRR20211786
+
 #define _XOPEN_SOURCE 600
 #include <stdio.h>
 #include <pthread.h>

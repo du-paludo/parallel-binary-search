@@ -1,8 +1,5 @@
-// chrono.h
-//
-// A small library to measure time in programs
-//
-// by W.Zola (2017)
+// Eduardo Stefanel Paludo - GRR20210581
+// Natael Pontarolo Gomes - GRR20211786
 
 #include "chrono.h"
 
