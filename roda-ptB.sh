@@ -1,3 +1,6 @@
+# Eduardo Stefanel Paludo - GRR20210581
+# Natael Pontarolo Gomes - GRR20211786
+
 #!/bin/bash
 echo "USAGE: ./roda-todos.sh <nElements> <nQueries>"
 
