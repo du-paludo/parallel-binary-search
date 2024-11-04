@@ -4,13 +4,19 @@
 # flags = -Wall
 nome = bsearch-A
 
-all: $(nome)
+all: bsearch-A bsearch-B
 
-$(nome): bsearch-A.o chrono.o
-	gcc -o $(nome) bsearch-A.o chrono.o $(flags)
+bsearch-A: bsearch-A.o chrono.o
+	gcc -o bsearch-A bsearch-A.o chrono.o $(flags)
+
+bsearch-B: bsearch-B.o chrono.o
+	gcc -o bsearch-B bsearch-B.o chrono.o $(flags)
 
 bsearch-A.o: bsearch-A.c
 	gcc -c bsearch-A.c $(flags)
+
+bsearch-B.o: bsearch-B.c
+	gcc -c bsearch-B.c $(flags)
 
 chrono.o: chrono.c
 	gcc -c chrono.c $(flags)
